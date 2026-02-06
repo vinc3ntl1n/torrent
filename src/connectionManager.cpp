@@ -2,9 +2,7 @@
 
 int connectionManager::startServer(int port) {
     int server_fd, new_fd, opt = 1;
-    ssize_t valread;
     struct sockaddr_in address;
-    struct addrinfo hints, *servinfo, *p;
     struct sockaddr_storage;
     socklen_t addrlen = sizeof(address);
     char buffer[1024] = { 0 };
@@ -28,23 +26,86 @@ int connectionManager::startServer(int port) {
         return -1;
     }
 
-    if(listen(server_fd, 4) < 0) { //number is how many many other programs can be in the queue
+    if(listen(server_fd, 4) < 0) {
         std::cout << "listening error" << std::endl;
         return -1;
     }
 
-    if((new_fd = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
+    while(true) {
+        if((new_fd = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
         std::cout << "accept error" << std:: endl;
+        }
+
+        allThreads.push_back(new_fd);
+        std::thread serverWorker(serverFunctions, new_fd);
+        serverWorker.detach();
+
     }
-
-    char temp[] = "temp";
-    valread = read(new_fd, buffer, 1024 - 1);
-    std::cout << buffer << std::endl;
-    send(new_fd, temp, strlen(temp), 0);
-
-    close(new_fd);
+    
+    closeConnections();
 
     close(server_fd);
 
     return 0;
+}
+
+
+int connectionManager::serverFunctions(int fd) {
+
+}
+
+int connectionManager::connectToPeer(int port, const char* address) {
+    struct addrinfo hints, *servinfo, *p;
+    int val, client_fd;
+    char s[INET_ADDRSTRLEN];
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if((val = getaddrinfo(address, std::to_string(port).c_str(), &hints, &servinfo)) != 0) {
+        std::cout << "error getting addrinfo" << std::endl;
+        return -1;
+    }
+
+    for(p = servinfo; p != NULL; p->ai_addr) {
+        if((client_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+            std::cout << "next client socket" << std::endl;
+            continue;
+        }
+
+        struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+        inet_ntop(p->ai_family, &(ipv4->sin_addr), s, sizeof(s));
+
+        if(connect(client_fd, p->ai_addr, p->ai_addrlen) == -1) {
+            std::cout << "error connection to server" << std::endl;
+            close(client_fd);
+            continue;
+        }
+
+        break;
+    }
+
+    if(p == nullptr) {
+        std::cout << "could not bind a socket" << std::endl;
+        return -1;
+    }
+
+    freeaddrinfo(servinfo);
+
+    
+
+    close(client_fd);    
+
+    return 0;
+}
+
+int connectionManager::clientFunctions(int fd) {
+    return -1;
+}
+
+void connectionManager::closeConnections() {
+    for(int thread : allThreads) {
+        close(thread);
+    }
 }
