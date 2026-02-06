@@ -12,14 +12,19 @@
 #include <vector>
 #include <arpa/inet.h>
 
+#include "configReader.h"
+
 class connectionManager{
     private:
-        std::vector<int> allThreads;
+        int server_fd;
+        std::vector<int> allServerThreads;
+        std::vector<int> allClientThreads;
     public:
-        int connectToPeer(int port, const char* address);
-        int startServer(int port);
-        int serverFunctions(int fd);
-        int clientFunctions(int fd);
+        connectionManager() = default;
+        int connectToPeer(int port, const char* address, int id);
+        int startServer(int port, int id);
+        int exchange(int fd, int id);
+        void closePeers(std::vector<int> threads);
         void closeConnections();
 };
 

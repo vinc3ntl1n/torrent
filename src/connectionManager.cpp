@@ -1,7 +1,7 @@
 #include "connectionManager.h"
 
-int connectionManager::startServer(int port) {
-    int server_fd, new_fd, opt = 1;
+int connectionManager::startServer(int port, int id) {
+    int connection_fd, opt = 1;
     struct sockaddr_in address;
     struct sockaddr_storage;
     socklen_t addrlen = sizeof(address);
@@ -32,29 +32,22 @@ int connectionManager::startServer(int port) {
     }
 
     while(true) {
-        if((new_fd = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
+        if((connection_fd = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
         std::cout << "accept error" << std:: endl;
         }
 
-        allThreads.push_back(new_fd);
-        std::thread serverWorker(serverFunctions, new_fd);
+        allServerThreads.push_back(connection_fd);
+        std::thread serverWorker(&connectionManager::exchange, this, connection_fd, id);
         serverWorker.detach();
 
     }
-    
-    closeConnections();
 
     close(server_fd);
 
     return 0;
 }
 
-
-int connectionManager::serverFunctions(int fd) {
-
-}
-
-int connectionManager::connectToPeer(int port, const char* address) {
+int connectionManager::connectToPeer(int port, const char* address, int id) {
     struct addrinfo hints, *servinfo, *p;
     int val, client_fd;
     char s[INET_ADDRSTRLEN];
@@ -93,19 +86,54 @@ int connectionManager::connectToPeer(int port, const char* address) {
 
     freeaddrinfo(servinfo);
 
-    
+    exchange(client_fd, id);
 
     close(client_fd);    
+    return 0;
+}
+
+int connectionManager::exchange(int fd, int id) {
+    char handshake[32], buffer[33] = { 0 };
+    int numberOfBytes;
+
+    std::cout << buffer << std::endl;
+
+    memset(handshake, 0, sizeof(handshake));
+
+    memcpy(handshake, "P2PFILESHARINGPROJ", 18);
+    memcpy(handshake + 18, "0000000000", 10);
+    std::string insertID = std::to_string(id);
+    memcpy(handshake + 28, insertID.c_str(), 4);
+
+    std::cout << "about to send handshake" << std::endl;
+
+    if(send(fd, handshake, sizeof(handshake), 0) == -1) { //or 32 ig
+        std::cout << "error sending handshake" << std::endl;
+        return -1;
+    }
+
+    std::cout << "handshake sent, waiting for recv..." << std::endl;
+
+    if((numberOfBytes = recv(fd, buffer, 32, 0)) == -1) {
+        std::cout << "recv error" << std::endl;
+        return -1;
+    }
+
+    buffer[numberOfBytes] = '\0';
+
+    std::cout << buffer << std::endl;
+
 
     return 0;
 }
 
-int connectionManager::clientFunctions(int fd) {
-    return -1;
+void connectionManager::closePeers(std::vector<int> threads) {
+    for(int thread : threads) {
+        close(thread);
+    }
 }
 
 void connectionManager::closeConnections() {
-    for(int thread : allThreads) {
-        close(thread);
-    }
+    closePeers(allServerThreads);
+    closePeers(allClientThreads);
 }
