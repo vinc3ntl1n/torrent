@@ -33,3 +33,23 @@ Message::Message(MessageType t) : type(t) {
   std::vector<uint8_t> Message::getPayload() {
       return payload;
   }
+
+  std::vector<uint8_t> Message::serialize() {
+      // Format: [4-byte length][1-byte type][payload]
+      // Length = size of (type + payload), not including length field itself
+
+      uint32_t length = 1 + payload.size();  // 1 byte for type + payload size
+      uint32_t netLength = htonl(length);
+
+      std::vector<uint8_t> result;
+      result.resize(4 + 1 + payload.size());  // length field + type + payload
+
+      memcpy(result.data(), &netLength, 4);           // bytes 0-3 inclusive: length
+      result[4] = static_cast<uint8_t>(type);         // byte 4 singleton: type
+
+      if (!payload.empty()) {
+          memcpy(result.data() + 5, payload.data(), payload.size());  // (exclusive of 4 inclusive of 5) bytes 5+ : payload
+      }
+
+      return result;
+  }
