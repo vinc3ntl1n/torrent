@@ -53,3 +53,21 @@ Message::Message(MessageType t) : type(t) {
 
       return result;
   }
+
+Message Message::deserialize(const uint8_t* data, uint32_t length) {
+    // data points to [type][payload], length includes type byte
+    // (the 4-byte length field was already read by the caller)
+
+    MessageType msgType = static_cast<MessageType>(data[0]);
+
+    if (length == 1) {
+        // No payload (choke, unchoke, interested, not interested)
+        return Message(msgType);
+    }
+
+    // Contains payload
+    std::vector<uint8_t> payload(data + 1, data + length);
+    return Message(msgType, payload);
+
+    // Note-Andy: This naively assumes the caller has already read the 4-byte length field and passes just the [type][payload] portion.
+}
