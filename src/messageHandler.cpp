@@ -20,3 +20,8 @@ Message::Message(MessageType t) : type(t) {
       payload.resize(4);
       memcpy(payload.data(), &netIndex, 4);
   }
+
+  // Constructor for messages with raw data (bitfield, piece)
+  Message::Message(MessageType t, std::vector<uint8_t> data) : type(t), payload(data) {
+      // payload is copied directly
+  }
