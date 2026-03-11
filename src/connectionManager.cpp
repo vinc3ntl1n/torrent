@@ -1,5 +1,21 @@
 #include "connectionManager.h"
 
+/*
+connectionManager.cpp
+This .cpp file handles the networking layer for the p2p communication.
+Key tasks which are in-progress
+- Listens for incoming TCP connections from other peers (working - VL Rocket)
+- Initiates outgoing TCP connections to peers (TODO-Andy: has started but has a bug in loop)
+- Performs handshake exchange on new connections (TODO-Andy send / receive has some layout)
+- Maintains socket file descriptors for all active peer connections (TODO-Andy - has some layout)
+
+
+
+TODOs that need attention:
+- Message sending/receiving (choke, unchoke, interested, etc)
+- Tracking which peer is on which connection
+*/
+
 int connectionManager::startServer(int port, int id) {
     int connection_fd, opt = 1;
     struct sockaddr_in address;
@@ -61,7 +77,8 @@ int connectionManager::connectToPeer(int port, const char* address, int id) {
         return -1;
     }
 
-    for(p = servinfo; p != NULL; p->ai_addr) {
+    for(p = servinfo; p != NULL; p->ai_addr) { // TODO-Andy Fix: Bug in loop - should be p = p->ai_next
+        
         if((client_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
             std::cout << "next client socket" << std::endl;
             continue;
@@ -99,7 +116,7 @@ int connectionManager::exchange(int fd, int id) {
     std::cout << buffer << std::endl;
 
     memset(handshake, 0, sizeof(handshake));
-
+// TODO-Andy: Peer ID should be 4-byte binary (network byte order), not ASCII string
     memcpy(handshake, "P2PFILESHARINGPROJ", 18);
     memcpy(handshake + 18, "0000000000", 10);
     std::string insertID = std::to_string(id);
@@ -113,7 +130,8 @@ int connectionManager::exchange(int fd, int id) {
     }
 
     std::cout << "handshake sent, waiting for recv..." << std::endl;
-
+// TODO-Andy: Validate received handshake - check header is "P2PFILESHARINGPROJ" and
+  verify peer ID
     if((numberOfBytes = recv(fd, buffer, 32, 0)) == -1) {
         std::cout << "recv error" << std::endl;
         return -1;
