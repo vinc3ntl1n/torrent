@@ -135,7 +135,7 @@ int connectionManager::exchange(int fd, int id) {
     memset(handshake, 0, sizeof(handshake));
 // TODO-Andy: Peer ID should be 4-byte binary (network byte order), not ASCII string
     memcpy(handshake, "P2PFILESHARINGPROJ", 18);
-    // memcpy(handshake + 18, "0000000000", 10);
+    // memcpy(handshake + 18, "0000000000", 10); // Removed-Andy: memset(handshake, 0, sizeof(handshake)) already sets all 32 bytes to 0x00. 
 
     /* There is an issue here by counterexample. 
     If I have an id = 1001, this copies ASCII '1', '0', '0', '1' (bytes: 49, 48, 48, 49)
@@ -149,8 +149,7 @@ int connectionManager::exchange(int fd, int id) {
     byte 2 = 0x03
     byte 3 : 0xE9
 
-    Solving this means the Handshake Send is done
-    
+    Solving this means the Handshake Send is done.
     */ 
     
     /*
@@ -173,15 +172,40 @@ int connectionManager::exchange(int fd, int id) {
 
     std::cout << "handshake sent, waiting for recv..." << std::endl;
 // TODO-Andy: Validate received handshake - check header is "P2PFILESHARINGPROJ" and verify peer ID
+    /* 
+    Previous Issues:
+        - Does not validate that header is "P2PFILESHARINGPROJ"
+        - No extraction of peer ID from the byte 28 to byte 31 inclusive
+        - It is still treating buffer as a string (but we have binary data)
+ 
+    Fix:
+        - Receive 32 bytes
+        - Check byte 0 to byte 17 inclusive to match "P2PFILESHARINGPROJ"
+        - Extract peer ID from bytes 28-31 inclusive using ntohl() (network to host long)
+        
+        - Do we need to verify it's the peer we expected?
+    */
+
     if((numberOfBytes = recv(fd, buffer, 32, 0)) == -1) {
         std::cout << "recv error" << std::endl;
         return -1;
     }
 
+    if(memcmp(buffer, "P2PFILESHARINGPROJ", 18) != 0) { // memcmp() compares two memoery regions byte-by-byte. Returns 0 if they match.
+      std::cout << "invalid handshake header" << std::endl;
+      return -1; // returns 0 if they match
+  }
+
+    uint32_t receivedId;
+    memcpy(&receivedId, buffer + 28, 4);
+    receivedId = ntohl(receivedId);  // ntohl() convert network byte order to host
+    std::cout << "received handshake from peer " << receivedId << std::endl;
+
+    /*
+    Removed-Andy: Deprecrated because now deemed unnecessary.
     buffer[numberOfBytes] = '\0';
-
     std::cout << buffer << std::endl;
-
+    */
 
     return 0;
 }
