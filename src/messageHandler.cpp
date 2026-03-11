@@ -25,3 +25,11 @@ Message::Message(MessageType t) : type(t) {
   Message::Message(MessageType t, std::vector<uint8_t> data) : type(t), payload(data) {
       // payload is copied directly
   }
+
+  MessageType Message::getType() {
+      return type;
+  }
+
+  std::vector<uint8_t> Message::getPayload() {
+      return payload;
+  }
