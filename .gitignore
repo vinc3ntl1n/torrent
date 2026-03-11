@@ -1,5 +1,5 @@
 **/unzipped/*
-
 *.exe
-
-*.o.DS_Store
+*.o
+.DS_Store
+peerProcess
