@@ -49,7 +49,8 @@ int connectionManager::startServer(int port, int id) {
 
     while(true) {
         if((connection_fd = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
-        std::cout << "accept error" << std:: endl;
+            std::cout << "accept error" << std:: endl;
+            continue;
         }
 
         allServerThreads.push_back(connection_fd);
