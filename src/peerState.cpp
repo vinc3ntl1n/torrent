@@ -75,9 +75,7 @@ void PeerState::setPiece(int index) {
 
 bool PeerState::isComplete() {
     for (int i = 0; i < totalPieces; ++i) {
-        if (!(myBitfield[i / 8] & (1 << (i % 8)))) {
-            return false;
-        }
+        if (!hasPiece(i)) return false;
     }
     return true;
 }
@@ -98,33 +96,61 @@ void PeerState::setNeighborBitfield(int peerID, std::vector<uint8_t> bitfield) {
 }
 
 bool PeerState::neighborHasPiece(int peerID, int pieceIndex) {
-    
+
+
+    //prevents bug of calling on a peers bitfield that doesnt exist yet
+    if (neighbors.find(peerID) == neighbors.end()) return false;
+    if (neighbors[peerID].bitfield.empty()) return false;
+
+    //checking the correct bit
+    int bytePos = pieceIndex/8;
+    int bitInByte = pieceIndex % 8;
+    int shiftAmount = 7 - bitInByte;
+    uint8_t mask = 1 << shiftAmount;
+
+    if (neighbors[peerID].bitfield[bytePos] & mask) {
+        return true;
+    }
+    else return false;
 }
 
 void PeerState::setNeighborPiece(int peerID, int pieceIndex) {
 
+    //prevents bug of calling on a peers bitfield that doesnt exist yet
+    if (neighbors.find(peerID) == neighbors.end()) return;
+    if (neighbors[peerID].bitfield.empty()) return;
+
+    
+    //checking the correct bit
+    int bytePos = pieceIndex/8;
+    int bitInByte = pieceIndex % 8;
+    int shiftAmount = 7 - bitInByte;
+    uint8_t mask = 1 << shiftAmount;
+
+    neighbors[peerID].bitfield[bytePos] |= mask;
+
 }
 
 void PeerState::setIAmChoked(int peerID, bool choked) {
-
+    neighbors[peerID].iAmChoked = choked;
 }
 
 void PeerState::setTheyAreInterested(int peerID, bool interested) {
-
+    neighbors[peerID].isInterested = interested;
 }
 
 bool PeerState::amIChokedBy(int peerID) {
-
+    return neighbors[peerID].iAmChoked;
 }
 
 bool PeerState::isNeighborInterestedInMe(int peerID) {
-
+    return neighbors[peerID].isInterested;
 }
 
 void PeerState::lock() {
-
+    stateMutex.lock();
 }
 
 void PeerState::unlock() {
-
+    stateMutex.unlock();
 }
