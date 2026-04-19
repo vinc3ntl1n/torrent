@@ -23,6 +23,7 @@ public:
     FileManager(int peerID, std::string fileName, int fileSize, int pieceSize, bool hasFile);
     std::vector<uint8_t> readPiece(int pieceIndex);
     void writePiece(int pieceIndex, std::vector<uint8_t> data);
+    ~FileManager();
 };
 
 
