@@ -10,10 +10,12 @@
 struct NeighborState {
     int peerID;
     std::vector<uint8_t> bitfield;
-    bool isChoked;
-    bool isInterested;
-    bool iAmChoked;      // are THEY choking ME
-    bool iAmInterested;  // am I interested in THEM
+    //default values
+    bool isChoked = true;
+    bool isInterested = false;
+    bool iAmChoked = true;      // are THEY choking ME
+    bool iAmInterested = false;  // am I interested in THEM
+    int downloadRate = 0;
 };
 
 class PeerState {
