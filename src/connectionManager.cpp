@@ -1,5 +1,4 @@
 #include "connectionManager.h"
-
 /*
 connectionManager.cpp
 This .cpp file handles the networking layer for the p2p communication.
@@ -15,6 +14,14 @@ TODOs that need attention:
 - Message sending/receiving (choke, unchoke, interested, etc)
 - Tracking which peer is on which connection
 */
+
+
+//hold shared state and file manger pointers
+connectionManager::connectionManager(PeerState* ps, FileManager* fm) {
+    this->peerState = ps;
+    this->fileManager = fm;
+}
+
 
 int connectionManager::startServer(int port, int id) {
     int connection_fd, opt = 1;
@@ -197,6 +204,8 @@ int connectionManager::exchange(int fd, int id) {
       return -1; // returns 0 if they match
   }
 
+
+  //extracting their peerid
     uint32_t receivedId;
     memcpy(&receivedId, buffer + 28, 4);
     receivedId = ntohl(receivedId);  // ntohl() convert network byte order to host
@@ -207,6 +216,11 @@ int connectionManager::exchange(int fd, int id) {
     buffer[numberOfBytes] = '\0';
     std::cout << buffer << std::endl;
     */
+
+    //add them as a neighbor
+    this->peerState->addNeighbor(int(receivedId));
+    
+
 
     return 0;
 }
