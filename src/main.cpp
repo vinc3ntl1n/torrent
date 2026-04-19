@@ -1,6 +1,7 @@
 #include "configReader.h"
 #include "connectionManager.h"
 #include "peerState.h"
+#include "fileManager.h"
 
 #include <iostream>
 #include <vector>
