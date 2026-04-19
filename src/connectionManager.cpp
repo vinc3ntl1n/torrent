@@ -128,7 +128,7 @@ int connectionManager::connectToPeer(int port, const char* address, int id) {
 }
 
 int connectionManager::exchange(int fd, int id) {
-    char handshake[32], buffer[33] = { 0 };
+    char handshake[32], buffer[33] = { 0 }; //buffer = recieved handshake
     int numberOfBytes;
 
     std::cout << buffer << std::endl;
