@@ -147,6 +147,73 @@ bool PeerState::isNeighborInterestedInMe(int peerID) {
     return neighbors[peerID].isInterested;
 }
 
+// are WE choking THEM (the opposite direction of iAmChoked)
+void PeerState::setChoking(int peerID, bool choked) {
+    neighbors[peerID].isChoked = choked;
+}
+
+bool PeerState::amIChoking(int peerID) {
+    return neighbors[peerID].isChoked;
+}
+
+// track bytes downloaded from a peer during this interval
+void PeerState::addDownloaded(int peerID, int bytes) {
+    neighbors[peerID].downloadRate += bytes;
+}
+
+int PeerState::getDownloadRate(int peerID) {
+    return neighbors[peerID].downloadRate;
+}
+
+void PeerState::resetAllDownloadRates() {
+    for (auto& [id, ns] : neighbors) {
+        ns.downloadRate = 0;
+    }
+}
+
+// return peer IDs of neighbors that are interested in us
+std::vector<int> PeerState::getInterestedNeighbors() {
+    std::vector<int> result;
+    for (auto& [id, ns] : neighbors) {
+        if (ns.isInterested) result.push_back(id);
+    }
+    return result;
+}
+
+// return peer IDs of neighbors that are choked AND interested
+std::vector<int> PeerState::getChokedInterestedNeighbors() {
+    std::vector<int> result;
+    for (auto& [id, ns] : neighbors) {
+        if (ns.isChoked && ns.isInterested) result.push_back(id);
+    }
+    return result;
+}
+
+// check if we have all pieces AND every neighbor we know about also has all pieces
+bool PeerState::allComplete(int totalPeers) {
+    if (!isComplete()) return false;
+    // make sure we're connected to everyone before declaring done
+    if ((int)neighbors.size() < totalPeers - 1) return false;
+    for (auto& [id, ns] : neighbors) {
+        if (ns.bitfield.empty()) return false;
+        // check every piece in their bitfield
+        for (int i = 0; i < totalPieces; i++) {
+            int bytePos = i / 8;
+            int shift = 7 - (i % 8);
+            if (!(ns.bitfield[bytePos] & (1 << shift))) return false;
+        }
+    }
+    return true;
+}
+
+int PeerState::countMyPieces() {
+    int count = 0;
+    for (int i = 0; i < totalPieces; i++) {
+        if (hasPiece(i)) count++;
+    }
+    return count;
+}
+
 void PeerState::lock() {
     stateMutex.lock();
 }
