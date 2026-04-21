@@ -46,7 +46,20 @@ public:
     void setTheyAreInterested(int peerID, bool interested);
     bool amIChokedBy(int peerID);
     bool isNeighborInterestedInMe(int peerID);
-    
+
+    // choking logic helpers
+    void setChoking(int peerID, bool choked);
+    bool amIChoking(int peerID);
+    void addDownloaded(int peerID, int bytes);
+    std::vector<int> getInterestedNeighbors();
+    std::vector<int> getChokedInterestedNeighbors();
+    int getDownloadRate(int peerID);
+    void resetAllDownloadRates();
+
+    // termination
+    bool allComplete(int totalPeers);
+    int countMyPieces();
+
     // mutex
     void lock();
     void unlock();
