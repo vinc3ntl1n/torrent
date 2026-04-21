@@ -27,14 +27,12 @@ void connectionManager::sendMessage(int fd, Message& msg) {
     sendAll(fd, data.data(), data.size());
 }
 
-void connectionManager::broadcastHave(int pieceIndex, int excludePeer) {
+void connectionManager::broadcastHave(int pieceIndex) {
     Message haveMsg(HAVE, (uint32_t)pieceIndex);
     std::vector<uint8_t> data = haveMsg.serialize();
     std::lock_guard<std::mutex> lock(fdMutex);
     for (auto& [peerID, peerFd] : peerFDs) {
-        if (peerID != excludePeer) {
-            sendAll(peerFd, data.data(), data.size());
-        }
+        sendAll(peerFd, data.data(), data.size());
     }
 }
 
@@ -78,10 +76,9 @@ int connectionManager::startServer(int port, int id) {
         return -1;
     }
 
-    while(true) {
+    while(!done) {
         if((connection_fd = accept(server_fd, (struct sockaddr*) &address, &addrlen)) < 0) {
-            std::cout << "accept error" << std:: endl;
-            continue;
+            break;
         }
 
         allServerThreads.push_back(connection_fd);
@@ -136,9 +133,10 @@ int connectionManager::connectToPeer(int port, const char* address, int id) {
 
     freeaddrinfo(servinfo);
 
-    exchange(client_fd, id, false);
+    allClientThreads.push_back(client_fd);
+    std::thread clientWorker(&connectionManager::exchange, this, client_fd, id, false);
+    clientWorker.detach();
 
-    close(client_fd);    
     return 0;
 }
 
@@ -174,8 +172,10 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
     this->peerState->addNeighbor(theirID);
 
     if (isServer) {
+        std::cout << "[" << id << "] Connected from peer " << theirID << std::endl;
         logger->log("Peer " + std::to_string(id) + " is connected from Peer " + std::to_string(theirID) + ".");
     } else {
+        std::cout << "[" << id << "] Connected to peer " << theirID << std::endl;
         logger->log("Peer " + std::to_string(id) + " makes a connection to Peer " + std::to_string(theirID) + ".");
     }
 
@@ -346,13 +346,15 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
                 }
 
                 int pieceCount = peerState->countMyPieces();
+                std::cout << "[" << id << "] Piece " << pieceIdx << " from " << theirID << " (" << pieceCount << "/" << peerState->getTotalPieces() << ")" << std::endl;
                 logger->log("Peer " + std::to_string(id) + " has downloaded the piece " + std::to_string(pieceIdx) + " from " + std::to_string(theirID) + ". Now the number of pieces it has is " + std::to_string(pieceCount) + ".");
 
                 if (peerState->isComplete()) {
+                    std::cout << "[" << id << "] Download complete!" << std::endl;
                     logger->log("Peer " + std::to_string(id) + " has downloaded the complete file.");
                 }
 
-                broadcastHave(pieceIdx, theirID);
+                broadcastHave(pieceIdx);
 
                 // after getting a piece, check if we should send NOT_INTERESTED to any neighbor
                 {
@@ -394,7 +396,9 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
             }
         }
 
-        if (peerState->allComplete(totalPeers)) break;
+        if (peerState->allComplete(totalPeers)) {
+            exit(0);
+        }
     }
 
     {

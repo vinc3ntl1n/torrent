@@ -38,10 +38,11 @@ class connectionManager{
         bool recvAll(int fd, uint8_t* buf, int len);
         bool sendAll(int fd, const uint8_t* buf, int len);
         void sendMessage(int fd, Message& msg);
-        void broadcastHave(int pieceIndex, int excludePeer);
+        void broadcastHave(int pieceIndex);
         int optimisticPeer = -1;
         int totalPeers = 0;
         int myID = 0;
+        bool done = false;
     public:
         connectionManager(PeerState *ps, FileManager *fm, Logger *lg, int numPeers, int peerID);
         int connectToPeer(int port, const char* address, int id);
