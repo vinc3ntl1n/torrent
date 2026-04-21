@@ -214,6 +214,10 @@ int PeerState::countMyPieces() {
     return count;
 }
 
+int PeerState::getTotalPieces() {
+    return totalPieces;
+}
+
 void PeerState::lock() {
     stateMutex.lock();
 }

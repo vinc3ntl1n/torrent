@@ -59,6 +59,7 @@ public:
     // termination
     bool allComplete(int totalPeers);
     int countMyPieces();
+    int getTotalPieces();
 
     // mutex
     void lock();
