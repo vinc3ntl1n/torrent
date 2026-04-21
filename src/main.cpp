@@ -12,8 +12,8 @@
 #include <arpa/inet.h>
 
 int main(int argc, char* argv[]) {
-    commonFile commonConfig = returnCommon("config/unzipped/project_config_file_small/project_config_file_small/Common.cfg");
-    std::vector<peerInfo> peers = returnPeerInfo("config/unzipped/project_config_file_small/project_config_file_small/PeerInfo.cfg");
+    commonFile commonConfig = returnCommon("Common.cfg");
+    std::vector<peerInfo> peers = returnPeerInfo("PeerInfo.cfg");
 
     int myID = std::stoi(argv[1]);
 

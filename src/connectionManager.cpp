@@ -197,19 +197,23 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
     std::vector<uint8_t> msgBuf(msgLen);
     if (!recvAll(fd, msgBuf.data(), msgLen)) return -1;
 
-    Message received = Message::deserialize(msgBuf.data(), msgLen);
-    if (received.getType() == BITFIELD) {
-        peerState->setNeighborBitfield(theirID, received.getPayload());
+    Message firstMsg = Message::deserialize(msgBuf.data(), msgLen);
+
+    bool gotBitfield = false;
+    if (firstMsg.getType() == BITFIELD) {
+        peerState->setNeighborBitfield(theirID, firstMsg.getPayload());
+        gotBitfield = true;
     }
 
     bool dominated = false;
-    std::vector<uint8_t> theirBits = received.getPayload();
-    std::vector<uint8_t> myBits = peerState->getMyBitfield();
-    int totalBytes = myBits.size();
-    for (int i = 0; i < totalBytes; i++) {
-        if (theirBits[i] & ~myBits[i]) {
-            dominated = true;
-            break;
+    if (gotBitfield) {
+        std::vector<uint8_t> theirBits = firstMsg.getPayload();
+        std::vector<uint8_t> myBits = peerState->getMyBitfield();
+        for (int i = 0; i < (int)myBits.size(); i++) {
+            if (theirBits[i] & ~myBits[i]) {
+                dominated = true;
+                break;
+            }
         }
     }
 
@@ -219,6 +223,23 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
     } else {
         Message notIntMsg(NOT_INTERESTED);
         sendMessage(fd, notIntMsg);
+    }
+
+    // if first message wasn't bitfield, handle it now as a regular message
+    if (!gotBitfield) {
+        // re-enter the switch below by processing firstMsg before the loop
+        std::vector<uint8_t> payload = firstMsg.getPayload();
+        switch (firstMsg.getType()) {
+            case INTERESTED:
+                peerState->setTheyAreInterested(theirID, true);
+                logger->log("Peer " + std::to_string(id) + " received the 'interested' message from " + std::to_string(theirID) + ".");
+                break;
+            case NOT_INTERESTED:
+                peerState->setTheyAreInterested(theirID, false);
+                logger->log("Peer " + std::to_string(id) + " received the 'not interested' message from " + std::to_string(theirID) + ".");
+                break;
+            default: break;
+        }
     }
 
     while (true) {
@@ -244,15 +265,19 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
                 peerState->setIAmChoked(theirID, false);
                 logger->log("Peer " + std::to_string(id) + " is unchoked by " + std::to_string(theirID) + ".");
                 std::vector<int> candidates;
-                for (int i = 0; i < (int)(peerState->getMyBitfield().size() * 8); i++) {
-                    if (!peerState->hasPiece(i) && peerState->neighborHasPiece(theirID, i)) {
-                        candidates.push_back(i);
+                {
+                    std::lock_guard<std::mutex> rlock(requestMutex);
+                    for (int i = 0; i < (int)(peerState->getMyBitfield().size() * 8); i++) {
+                        if (!peerState->hasPiece(i) && peerState->neighborHasPiece(theirID, i) && requestedPieces.find(i) == requestedPieces.end()) {
+                            candidates.push_back(i);
+                        }
                     }
-                }
-                if (!candidates.empty()) {
-                    int pick = candidates[rand() % candidates.size()];
-                    Message req(REQUEST, (uint32_t)pick);
-                    sendMessage(fd, req);
+                    if (!candidates.empty()) {
+                        int pick = candidates[rand() % candidates.size()];
+                        requestedPieces.insert(pick);
+                        Message req(REQUEST, (uint32_t)pick);
+                        sendMessage(fd, req);
+                    }
                 }
                 break;
             }
@@ -306,6 +331,11 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
                 peerState->setPiece(pieceIdx);
                 peerState->addDownloaded(theirID, pieceData.size());
 
+                {
+                    std::lock_guard<std::mutex> rlock(requestMutex);
+                    requestedPieces.erase(pieceIdx);
+                }
+
                 int pieceCount = peerState->countMyPieces();
                 logger->log("Peer " + std::to_string(id) + " has downloaded the piece " + std::to_string(pieceIdx) + " from " + std::to_string(theirID) + ". Now the number of pieces it has is " + std::to_string(pieceCount) + ".");
 
@@ -315,18 +345,37 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
 
                 broadcastHave(pieceIdx, theirID);
 
-                if (peerState->allComplete(totalPeers)) break;
+                // after getting a piece, check if we should send NOT_INTERESTED to any neighbor
+                {
+                    std::lock_guard<std::mutex> lock(fdMutex);
+                    for (auto& [pid, pfd] : peerFDs) {
+                        bool theyHaveSomethingWeNeed = false;
+                        for (int i = 0; i < (int)(peerState->getMyBitfield().size() * 8); i++) {
+                            if (!peerState->hasPiece(i) && peerState->neighborHasPiece(pid, i)) {
+                                theyHaveSomethingWeNeed = true;
+                                break;
+                            }
+                        }
+                        if (!theyHaveSomethingWeNeed) {
+                            Message notInt(NOT_INTERESTED);
+                            sendMessage(pfd, notInt);
+                        }
+                    }
+                }
 
+                if (peerState->allComplete(totalPeers)) break;
 
                 if (!peerState->amIChokedBy(theirID)) {
                     std::vector<int> candidates;
+                    std::lock_guard<std::mutex> rlock(requestMutex);
                     for (int i = 0; i < (int)(peerState->getMyBitfield().size() * 8); i++) {
-                        if (!peerState->hasPiece(i) && peerState->neighborHasPiece(theirID, i)) {
+                        if (!peerState->hasPiece(i) && peerState->neighborHasPiece(theirID, i) && requestedPieces.find(i) == requestedPieces.end()) {
                             candidates.push_back(i);
                         }
                     }
                     if (!candidates.empty()) {
                         int pick = candidates[rand() % candidates.size()];
+                        requestedPieces.insert(pick);
                         Message req(REQUEST, (uint32_t)pick);
                         sendMessage(fd, req);
                     }

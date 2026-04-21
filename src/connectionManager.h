@@ -18,6 +18,7 @@
 #include "messageHandler.h"
 #include "logger.h"
 #include <map>
+#include <set>
 #include <mutex>
 
 class connectionManager{
@@ -30,6 +31,8 @@ class connectionManager{
         Logger *logger;
         std::map<int, int> peerFDs;
         std::mutex fdMutex;
+        std::set<int> requestedPieces;
+        std::mutex requestMutex;
 
         bool recvAll(int fd, uint8_t* buf, int len);
         bool sendAll(int fd, const uint8_t* buf, int len);
