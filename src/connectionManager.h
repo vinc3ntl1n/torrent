@@ -32,6 +32,7 @@ class connectionManager{
         std::map<int, int> peerFDs;
         std::mutex fdMutex;
         std::set<int> requestedPieces;
+        std::map<int, int> pendingPerPeer;
         std::mutex requestMutex;
 
         bool recvAll(int fd, uint8_t* buf, int len);

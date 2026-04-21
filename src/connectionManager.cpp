@@ -259,6 +259,13 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
             case CHOKE: {
                 peerState->setIAmChoked(theirID, true);
                 logger->log("Peer " + std::to_string(id) + " is choked by " + std::to_string(theirID) + ".");
+                {
+                    std::lock_guard<std::mutex> rlock(requestMutex);
+                    if (pendingPerPeer.count(theirID)) {
+                        requestedPieces.erase(pendingPerPeer[theirID]);
+                        pendingPerPeer.erase(theirID);
+                    }
+                }
                 break;
             }
             case UNCHOKE: {
@@ -275,6 +282,7 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
                     if (!candidates.empty()) {
                         int pick = candidates[rand() % candidates.size()];
                         requestedPieces.insert(pick);
+                        pendingPerPeer[theirID] = pick;
                         Message req(REQUEST, (uint32_t)pick);
                         sendMessage(fd, req);
                     }
@@ -334,6 +342,7 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
                 {
                     std::lock_guard<std::mutex> rlock(requestMutex);
                     requestedPieces.erase(pieceIdx);
+                    pendingPerPeer.erase(theirID);
                 }
 
                 int pieceCount = peerState->countMyPieces();
@@ -376,6 +385,7 @@ int connectionManager::exchange(int fd, int id, bool isServer) {
                     if (!candidates.empty()) {
                         int pick = candidates[rand() % candidates.size()];
                         requestedPieces.insert(pick);
+                        pendingPerPeer[theirID] = pick;
                         Message req(REQUEST, (uint32_t)pick);
                         sendMessage(fd, req);
                     }
