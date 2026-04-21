@@ -15,23 +15,38 @@
 #include "configReader.h"
 #include "peerState.h"
 #include "fileManager.h"
+#include "messageHandler.h"
+#include "logger.h"
+#include <map>
+#include <mutex>
 
 class connectionManager{
     private:
         int server_fd;
         std::vector<int> allServerThreads;
         std::vector<int> allClientThreads;
-        //pointer to filemanager for this guy
         FileManager *fileManager;
-        //pointer to shared state for this guy
         PeerState *peerState;
-    public: 
-        connectionManager(PeerState *ps, FileManager *fm); // constructor no longer default. takes in shared statae and file manager
+        Logger *logger;
+        std::map<int, int> peerFDs;
+        std::mutex fdMutex;
+
+        bool recvAll(int fd, uint8_t* buf, int len);
+        bool sendAll(int fd, const uint8_t* buf, int len);
+        void sendMessage(int fd, Message& msg);
+        void broadcastHave(int pieceIndex, int excludePeer);
+        int optimisticPeer = -1;
+        int totalPeers = 0;
+        int myID = 0;
+    public:
+        connectionManager(PeerState *ps, FileManager *fm, Logger *lg, int numPeers, int peerID);
         int connectToPeer(int port, const char* address, int id);
         int startServer(int port, int id);
-        int exchange(int fd, int id);
+        int exchange(int fd, int id, bool isServer);
         void closePeers(std::vector<int> threads);
         void closeConnections();
+        void unchokingTimer(int interval, int k);
+        void optimisticTimer(int interval);
 };
 
 
