@@ -8,7 +8,7 @@ FileManager::FileManager(int peerID, std::string fileName, int fileSize, int pie
     this->totalPieces = (fileSize + pieceSize - 1) / pieceSize;
 
     //file path using peer id and file name
-    this->filePath = "unzipped/project_config_file_small/" + std::to_string(peerID) + "/" + fileName;
+    this->filePath = "peer_" + std::to_string(peerID) + "/" + fileName;
 
 
     if (hasFile) {
@@ -34,8 +34,7 @@ FileManager::FileManager(int peerID, std::string fileName, int fileSize, int pie
 }
 
 std::vector<uint8_t> FileManager::readPiece(int pieceIndex) {
-    std::lock_guard<std::mutex> guard(fileMutex); // auto unlocks at end of functoin no matter what
-    fileMutex.lock();
+    std::lock_guard<std::mutex> guard(fileMutex);
     int offset = pieceIndex * pieceSize;
 
 
@@ -50,13 +49,11 @@ std::vector<uint8_t> FileManager::readPiece(int pieceIndex) {
     std::vector<uint8_t> output(thisPieceSize);
     file.seekg(offset);
     file.read((char*)output.data(), thisPieceSize);
-    fileMutex.unlock();
     return output;
 }
 
 void FileManager::writePiece(int pieceIndex, std::vector<uint8_t> data) {
     std::lock_guard<std::mutex> guard(fileMutex);
-    fileMutex.lock();
     int offset = pieceIndex * pieceSize;
 
     //handles last piece whihc is not exaclty 16k size
@@ -67,8 +64,7 @@ void FileManager::writePiece(int pieceIndex, std::vector<uint8_t> data) {
 
     file.seekp(offset);
     file.write((char*)data.data(), data.size());
-    file.flush(); //immediately writes
-    fileMutex.unlock();
+    file.flush();
 }
 
 FileManager::~FileManager() {
